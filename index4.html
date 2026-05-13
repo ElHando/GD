@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>GD Engine v2</title>
+<style>
+body { margin:0; overflow:hidden; background:#0b0b0b; font-family:Arial; }
+canvas { display:block; }
+#ui {
+    position:absolute;
+    top:10px;
+    left:10px;
+    color:white;
+    z-index:10;
+}
+button {
+    padding:10px;
+    margin:5px;
+}
+</style>
+</head>
+
+<body>
+<div id="ui"></div>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// --------------------
+// GAME STATE
+// --------------------
+let state = "menu"; // menu, play, dead, win
+let levelIndex = 0;
+
+// --------------------
+// PLAYER
+// --------------------
+const player = {
+    x: 150,
+    y: 0,
+    vy: 0,
+    size: 40,
+    grounded: false
+};
+
+const gravity = 0.75;
+const jumpPower = -14;
+
+// --------------------
+// CAMERA
+// --------------------
+let cameraX = 0;
+let speed = 5;
+
+// --------------------
+// LEVEL SYSTEM
+// --------------------
+// 0 = spike, 1 = jump pad, 2 = portal
+const levels = [
+{
+    name: "Level 1",
+    objects: [
+        {type:0, x:600},
+        {type:0, x:900},
+        {type:1, x:1200},
+        {type:0, x:1500},
+        {type:0, x:1800},
+    ],
+    length: 2200
+},
+{
+    name: "Level 2",
+    objects: [
+        {type:0, x:500},
+        {type:0, x:800},
+        {type:1, x:1000},
+        {type:0, x:1300},
+        {type:1, x:1600},
+        {type:0, x:1900},
+    ],
+    length: 2400
+}
+];
+
+// --------------------
+// RESET
+// --------------------
+function reset(){
+    player.y = canvas.height - 140;
+    player.vy = 0;
+    player.grounded = false;
+    cameraX = 0;
+}
+
+// --------------------
+// INPUT
+// --------------------
+function jump(){
+    if (state === "play" && player.grounded) {
+        player.vy = jumpPower;
+        player.grounded = false;
+    }
+}
+
+window.addEventListener("keydown", e => {
+    if (e.code === "Space") {
+        if (state === "menu") startLevel(0);
+        else jump();
+    }
+});
+
+window.addEventListener("mousedown", jump);
+
+// --------------------
+// START LEVEL
+// --------------------
+function startLevel(i){
+    levelIndex = i;
+    state = "play";
+    reset();
+}
+
+// --------------------
+// COLLISION
+// --------------------
+function collide(a,b){
+    return a.x < b.x + b.w &&
+           a.x + a.size > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.size > b.y;
+}
+
+// --------------------
+// UPDATE
+// --------------------
+function update(){
+    if (state !== "play") return;
+
+    cameraX += speed;
+
+    player.vy += gravity;
+    player.y += player.vy;
+
+    let ground = canvas.height - 100;
+
+    if (player.y > ground - player.size) {
+        player.y = ground - player.size;
+        player.vy = 0;
+        player.grounded = true;
+    }
+
+    let lvl = levels[levelIndex];
+
+    for (let o of lvl.objects) {
+        let ox = o.x - cameraX;
+        let obj = {x:ox, y:canvas.height-140, w:40, h:40};
+
+        if (o.type === 0) {
+            if (collide(player, obj)) {
+                state = "dead";
+            }
+        }
+
+        if (o.type === 1) {
+            if (player.x < obj.x+40 && player.x+40 > obj.x &&
+                player.y+40 >= obj.y) {
+                player.vy = -20; // jump pad
+            }
+        }
+    }
+
+    if (cameraX > lvl.length) {
+        state = "win";
+    }
+}
+
+// --------------------
+// DRAW
+// --------------------
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // ground
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, canvas.height-100, canvas.width, 100);
+
+    let lvl = levels[levelIndex];
+
+    // objects
+    for (let o of lvl.objects) {
+        let x = o.x - cameraX;
+        let y = canvas.height - 140;
+
+        if (o.type === 0) {
+            ctx.fillStyle = "#ff0044";
+            ctx.beginPath();
+            ctx.moveTo(x,y+40);
+            ctx.lineTo(x+20,y);
+            ctx.lineTo(x+40,y+40);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        if (o.type === 1) {
+            ctx.fillStyle = "#00ff99";
+            ctx.fillRect(x,y,40,10);
+        }
+    }
+
+    // player
+    ctx.fillStyle = "#00ffff";
+    ctx.fillRect(player.x, player.y, 40, 40);
+
+    // UI
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+
+    if (state === "menu") {
+        ctx.fillText("SPACE to Start", 20, 40);
+    }
+
+    if (state === "dead") {
+        ctx.font = "50px Arial";
+        ctx.fillText("DEAD", canvas.width/2 - 100, canvas.height/2);
+        ctx.font = "20px Arial";
+        ctx.fillText("Refresh or press SPACE", canvas.width/2 - 120, canvas.height/2 + 40);
+    }
+
+    if (state === "win") {
+        ctx.font = "50px Arial";
+        ctx.fillText("LEVEL COMPLETE!", canvas.width/2 - 200, canvas.height/2);
+    }
+}
+
+// --------------------
+// LOOP
+// --------------------
+function loop(){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+</body>
+</html>
