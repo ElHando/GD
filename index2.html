@@ -1,102 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Geometry Dash Style Game</title>
+<title>Geometry Dash Test</title>
 <style>
-    body {
-        margin: 0;
-        overflow: hidden;
-        background: #111;
-        font-family: Arial, sans-serif;
-    }
-
-    canvas {
-        display: block;
-        background: linear-gradient(#1e1e1e, #0f0f0f);
-    }
-
-    #ui {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        color: white;
-        z-index: 10;
-        font-size: 20px;
-    }
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #111;
+}
+canvas {
+    display: block;
+}
+#ui {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    font-family: Arial;
+}
 </style>
 </head>
+
 <body>
-<div id="ui">Press SPACE to Jump</div>
+<div id="ui">Press SPACE to jump</div>
 <canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const gravity = 0.8;
-const jumpForce = -14;
-const groundHeight = 100;
-
-let gameSpeed = 6;
-let cameraX = 0;
-let gameOver = false;
-let win = false;
-
-const player = {
-    x: 150,
-    y: 0,
-    width: 50,
-    height: 50,
-    velocityY: 0,
-    grounded: false,
-    rotation: 0
-};
-
-const levelLength = 5000;
-
-const obstacles = [
-    {x: 500, width: 60, height: 60},
-    {x: 800, width: 60, height: 120},
-    {x: 1200, width: 60, height: 80},
-    {x: 1600, width: 60, height: 160},
-    {x: 2000, width: 60, height: 60},
-    {x: 2400, width: 60, height: 140},
-    {x: 2800, width: 60, height: 80},
-    {x: 3300, width: 60, height: 180},
-    {x: 3800, width: 60, height: 100},
-    {x: 4300, width: 60, height: 200}
-];
-
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-
-    player.y = canvas.height - groundHeight - player.height;
 }
-
 window.addEventListener("resize", resize);
-window.addEventListener("load", () => {
-    resize();
-    gameLoop();
-});
+resize();
 
-function resetGame() {
-    cameraX = 0;
-    gameOver = false;
-    win = false;
-    player.velocityY = 0;
-    player.y = canvas.height - groundHeight - player.height;
-}
+let player = {
+    x: 100,
+    y: 100,
+    vy: 0,
+    size: 50,
+    grounded: false
+};
+
+const gravity = 0.8;
+const jumpPower = -15;
+
+let groundY = canvas.height - 100;
 
 function jump() {
-    if ((player.grounded || player.y >= canvas.height - groundHeight - player.height) && !gameOver && !win) {
-        player.velocityY = jumpForce;
+    if (player.grounded) {
+        player.vy = jumpPower;
         player.grounded = false;
     }
-
-    if (gameOver || win) resetGame();
 }
 
 window.addEventListener("keydown", e => {
@@ -106,81 +65,38 @@ window.addEventListener("keydown", e => {
 window.addEventListener("mousedown", jump);
 
 function update() {
-    if (gameOver || win) return;
+    groundY = canvas.height - 100;
 
-    cameraX += gameSpeed;
+    player.vy += gravity;
+    player.y += player.vy;
 
-    player.velocityY += gravity;
-    player.y += player.velocityY;
-
-    const groundY = canvas.height - groundHeight - player.height;
-
-    if (player.y >= groundY) {
-        player.y = groundY;
-        player.velocityY = 0;
+    if (player.y + player.size >= groundY) {
+        player.y = groundY - player.size;
+        player.vy = 0;
         player.grounded = true;
     }
-
-    for (let obs of obstacles) {
-        const ox = obs.x - cameraX;
-        const oy = canvas.height - groundHeight - obs.height;
-
-        if (
-            player.x < ox + obs.width &&
-            player.x + player.width > ox &&
-            player.y < oy + obs.height &&
-            player.y + player.height > oy
-        ) {
-            gameOver = true;
-        }
-    }
-
-    if (cameraX > levelLength) win = true;
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // ground
-    ctx.fillStyle = "#222";
-    ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+    ctx.fillStyle = "#333";
+    ctx.fillRect(0, groundY, canvas.width, 100);
 
     // player
     ctx.fillStyle = "#00ffff";
-    ctx.fillRect(player.x, player.y, player.width, player.height);
-
-    // obstacles
-    ctx.fillStyle = "#ff0066";
-    for (let obs of obstacles) {
-        const x = obs.x - cameraX;
-        const y = canvas.height - groundHeight - obs.height;
-        ctx.fillRect(x, y, obs.width, obs.height);
-    }
-
-    // UI
-    ctx.fillStyle = "white";
-    ctx.font = "20px Arial";
-    ctx.fillText("SPACE to jump", 20, 30);
-
-    const percent = Math.min((cameraX / levelLength) * 100, 100);
-    ctx.fillText("Progress: " + Math.floor(percent) + "%", 20, 60);
-
-    if (gameOver) {
-        ctx.font = "60px Arial";
-        ctx.fillText("GAME OVER", 300, 300);
-    }
-
-    if (win) {
-        ctx.font = "60px Arial";
-        ctx.fillText("YOU WIN!", 300, 300);
-    }
+    ctx.fillRect(player.x, player.y, player.size, player.size);
 }
 
-function gameLoop() {
+function loop() {
     update();
     draw();
-    requestAnimationFrame(gameLoop);
+    requestAnimationFrame(loop);
 }
+
+loop();
 </script>
+
 </body>
 </html>
