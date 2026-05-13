@@ -1,3 +1,24 @@
+<!--
+GITHUB PAGES SETUP
+
+1. Create a new GitHub repository.
+2. Upload this file and rename it to index.html.
+3. Go to:
+   Settings → Pages
+4. Under "Build and deployment":
+   - Source: Deploy from a branch
+   - Branch: main
+   - Folder: /root
+5. Click Save.
+6. Your game will be live at:
+   https://YOUR-USERNAME.github.io/YOUR-REPOSITORY-NAME/
+
+OPTIONAL:
+- Add sounds by using HTML audio tags.
+- Add more levels or backgrounds.
+- Replace shapes with sprite images.
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -354,3 +375,4 @@
   </script>
 </body>
 </html>
+
