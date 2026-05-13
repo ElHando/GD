@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>GD Engine v3</title>
+<style>
+body { margin:0; overflow:hidden; background:#0a0a0a; font-family:Arial; }
+canvas { display:block; }
+#ui {
+    position:absolute;
+    top:10px;
+    left:10px;
+    color:white;
+    z-index:10;
+}
+</style>
+</head>
+
+<body>
+<div id="ui"></div>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+    canvas.width = innerWidth;
+    canvas.height = innerHeight;
+}
+addEventListener("resize", resize);
+resize();
+
+// --------------------
+// GAME STATE
+// --------------------
+let state = "menu"; // menu, play, dead, win
+let mode = "cube";  // cube, ship, wave
+let cameraX = 0;
+let speed = 5;
+
+// --------------------
+// PLAYER
+// --------------------
+let player = {
+    x: 150,
+    y: 0,
+    vy: 0,
+    size: 35,
+    grounded: false
+};
+
+const gravity = 0.75;
+const jumpPower = -14;
+
+// --------------------
+// LEVEL DATA (editable system)
+// --------------------
+let level = JSON.parse(localStorage.getItem("gd_level")) || {
+    objects: [
+        {type:"spike", x:600},
+        {type:"spike", x:900},
+        {type:"pad", x:1200},
+        {type:"portal", x:1500, mode:"ship"},
+        {type:"spike", x:1900},
+        {type:"portal", x:2200, mode:"wave"},
+        {type:"spike", x:2500}
+    ],
+    length: 2800
+};
+
+// --------------------
+// PARTICLES
+// --------------------
+let particles = [];
+
+function spawnParticles(x,y,color){
+    for(let i=0;i<12;i++){
+        particles.push({
+            x,y,
+            vx:(Math.random()-0.5)*6,
+            vy:(Math.random()-0.5)*6,
+            life:30,
+            color
+        });
+    }
+}
+
+// --------------------
+// INPUT
+// --------------------
+function jump(){
+    if(state !== "play") return;
+
+    if(mode === "cube" && player.grounded){
+        player.vy = jumpPower;
+        player.grounded = false;
+    }
+
+    if(mode === "ship"){
+        player.vy = -3;
+    }
+
+    if(state === "dead"){
+        reset();
+    }
+}
+
+addEventListener("keydown", e=>{
+    if(e.code==="Space"){
+        if(state==="menu") start();
+        else jump();
+    }
+
+    if(e.code==="KeyR") reset();
+
+    // editor add spike
+    if(e.code==="KeyE"){
+        level.objects.push({type:"spike", x:cameraX + canvas.width});
+        localStorage.setItem("gd_level", JSON.stringify(level));
+    }
+});
+
+addEventListener("mousedown", jump);
+
+// --------------------
+// START / RESET
+// --------------------
+function start(){
+    state="play";
+    reset();
+}
+
+function reset(){
+    cameraX=0;
+    player.y = canvas.height-120;
+    player.vy=0;
+    mode="cube";
+    state="play";
+}
+
+function collide(a,b){
+    return a.x < b.x+b.w &&
+           a.x+a.size > b.x &&
+           a.y < b.y+b.h &&
+           a.y+a.size > b.y;
+}
+
+// --------------------
+// UPDATE
+// --------------------
+function update(){
+
+if(state!=="play") return;
+
+cameraX += speed;
+
+// gravity modes
+if(mode==="cube"){
+    player.vy += gravity;
+}
+if(mode==="wave"){
+    player.vy += 0.3;
+}
+if(mode==="ship"){
+    player.vy *= 0.98;
+}
+
+player.y += player.vy;
+
+// ground
+let ground = canvas.height-100;
+
+if(player.y > ground-player.size){
+    player.y = ground-player.size;
+    player.vy=0;
+    player.grounded=true;
+}
+
+// level objects
+for(let o of level.objects){
+    let ox = o.x - cameraX;
+    let obj = {x:ox,y:canvas.height-120,w:40,h:40};
+
+    if(o.type==="spike"){
+        if(collide(player,obj)){
+            spawnParticles(player.x,player.y,"red");
+            state="dead";
+        }
+    }
+
+    if(o.type==="pad"){
+        if(player.x < obj.x+40 && player.x+40 > obj.x){
+            player.vy = -18;
+        }
+    }
+
+    if(o.type==="portal"){
+        if(player.x < obj.x+40 && player.x+40 > obj.x){
+            mode = o.mode;
+        }
+    }
+}
+
+// particles
+particles = particles.filter(p=>p.life>0);
+for(let p of particles){
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+}
+
+// win
+if(cameraX > level.length){
+    state="win";
+}
+}
+
+// --------------------
+// DRAW
+// --------------------
+function draw(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+// ground
+ctx.fillStyle="#222";
+ctx.fillRect(0,canvas.height-100,canvas.width,100);
+
+// objects
+for(let o of level.objects){
+    let x=o.x-cameraX;
+    let y=canvas.height-120;
+
+    if(o.type==="spike"){
+        ctx.fillStyle="#ff0044";
+        ctx.beginPath();
+        ctx.moveTo(x,y+40);
+        ctx.lineTo(x+20,y);
+        ctx.lineTo(x+40,y+40);
+        ctx.fill();
+    }
+
+    if(o.type==="pad"){
+        ctx.fillStyle="#00ff99";
+        ctx.fillRect(x,y,40,10);
+    }
+
+    if(o.type==="portal"){
+        ctx.fillStyle="cyan";
+        ctx.beginPath();
+        ctx.arc(x+20,y+20,20,0,Math.PI*2);
+        ctx.fill();
+    }
+}
+
+// player
+ctx.fillStyle="cyan";
+ctx.fillRect(player.x,player.y,player.size,player.size);
+
+// particles
+for(let p of particles){
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x,p.y,4,4);
+}
+
+// UI
+ctx.fillStyle="white";
+ctx.font="18px Arial";
+ctx.fillText("Mode: "+mode,20,30);
+
+if(state==="menu"){
+    ctx.fillText("SPACE to Start",20,60);
+}
+
+if(state==="dead"){
+    ctx.font="50px Arial";
+    ctx.fillText("DEAD",canvas.width/2-100,canvas.height/2);
+}
+
+if(state==="win"){
+    ctx.font="50px Arial";
+    ctx.fillText("LEVEL COMPLETE",canvas.width/2-220,canvas.height/2);
+}
+}
+
+// --------------------
+// LOOP
+// --------------------
+function loop(){
+update();
+draw();
+requestAnimationFrame(loop);
+}
+loop();
+
+</script>
+</body>
+</html>
